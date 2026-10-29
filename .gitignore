@@ -1,0 +1,30 @@
+# ── Security working artifacts (findings, PoCs, scan outputs) ──
+# Working state, not source. Keep out of any public distribution of the repo.
+.security/
+
+# ── Java / build ──
+target/
+build/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# ── IDE / OS ──
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.swp
+
+# ── Logs & env ──
+*.log
+.env
+.env.*
+!.env.example
+
+# ── Python ──
+__pycache__/
+*.pyc
