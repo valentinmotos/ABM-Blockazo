@@ -4,3 +4,66 @@
 @media(max-width:700px){.auth-page{display:block;min-height:100svh}.auth-card{width:min(440px,calc(100% - 38px));padding:30px 0}.auth-card .eyebrow{margin-top:34px}.auth-aside{display:none}.form-row{gap:11px}.app-shell{display:block;padding-bottom:64px}.sidebar{position:fixed;z-index:5;inset:auto 0 0;display:block;width:auto;height:62px;padding:5px 8px;border-top:1px solid var(--line);border-right:0;background:#fff}.sidebar .brand,.side-label,.sidebar-bottom{display:none}.side-nav{display:grid;grid-template-columns:1fr 1fr;gap:5px;height:100%}.nav-item{justify-content:center;height:50px;gap:8px;font-size:11px}.nav-item svg{width:16px;height:16px}.main-content{min-height:calc(100svh - 62px)}.topbar{height:52px;padding:0 18px}.content-wrap{width:calc(100% - 32px);padding:27px 0 18px}.page-heading{align-items:flex-start;margin-bottom:20px}.page-heading h1{font-size:26px}.page-heading>div>p:last-child{max-width:260px;line-height:1.5}.secure-label{gap:4px;padding:6px;font-size:0}.secure-label svg{width:15px;height:15px}.panel{padding:19px 16px}.panel-heading{margin-bottom:21px}.connect-panel{flex-wrap:wrap}.connect-copy{min-width:calc(100% - 58px)}.connect-panel .button{width:100%}.content-footer{gap:12px;font-size:9px}.password-panel{max-width:none}}
 @media(max-width:420px){.form-row{grid-template-columns:1fr}.auth-card h1{font-size:29px}.auth-card{padding-top:22px}.auth-card .eyebrow{margin-top:28px}.privacy-note{align-items:flex-start;text-align:center;line-height:1.5}}
 button:focus-visible,a:focus-visible{outline:3px solid #46a995;outline-offset:3px}@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+
+/* Identidad Block: envoltorio amarillo, cacao oscuro y crema. */
+:root{--ink:#392113;--muted:#78675b;--line:#eadfca;--mint:#e8b800;--mint-dark:#c29200;--mint-soft:#fff2bd;--paper:#fffdf7;--focus:#9b5b20;color:var(--ink);background:#fff9e9}
+body{background:#fff9e9;color:var(--ink)}
+.brand{color:#392113}
+.brand-mark{border-radius:7px;background:#f5c928;color:#392113;box-shadow:inset 0 -3px 0 #d5a900}
+.auth-page{background:#fff9e9}
+.auth-card{padding-top:42px}
+.auth-card .eyebrow,.page-heading .eyebrow{color:#93601a}
+.auth-card h1,.page-heading h1{color:#392113}
+.auth-aside{background:#432516;color:#fff8e6}
+.auth-aside::before{position:absolute;top:13%;right:-45px;width:245px;height:132px;border:9px solid #f4c62b;border-radius:22px;background-color:#6b3718;background-image:linear-gradient(90deg,transparent 48%,#3d2114 49%,#3d2114 52%,transparent 53%),linear-gradient(transparent 47%,#3d2114 48%,#3d2114 52%,transparent 53%);box-shadow:0 16px 0 #d6a812,0 26px 38px #1e100c55;content:'';transform:rotate(10deg)}
+.aside-content{max-width:450px}
+.aside-kicker{display:inline-block;margin:0 0 24px;padding:8px 11px;border-radius:4px;background:#f5c928;color:#392113;font-size:10px;letter-spacing:1.6px}
+.aside-content h2{color:#fff8e6;font-weight:800;letter-spacing:-2.4px}
+.aside-content h2::first-line{color:#f5c928}
+.aside-content>p{color:#ead6ba}
+.aside-footer{color:#fff0d2}
+.aside-footer .status-dot{background:#f5c928;box-shadow:0 0 0 3px #f5c92833}
+.aside-brand{color:#f5c928}
+.aside-brand span{color:#d9c2a2}
+.orbit{border-color:#f5c92820}
+input{border-color:#e4d7bd;background:#fffefa;color:#392113}
+input:focus{border-color:#a46620;box-shadow:0 0 0 3px #e8b80035}
+.field-hint{color:#776657}
+.button.primary{background:#f3c623;color:#392113;box-shadow:inset 0 -3px 0 #d5a900}
+.button.primary:hover:not(:disabled){background:#eabd12}
+.button.secondary{border-color:#deceb0;color:#54361f}
+.button.secondary:hover:not(:disabled){border-color:#bd8a29;background:#fff8df}
+.google{border-color:#e3d9c8;background:#fffefa}
+.google:hover{background:#fff8e3}
+.text-button{color:#805012}
+.privacy-note{color:#756454}
+.notice.error{border-color:#e6bdb1;background:#fff5f1;color:#8c352b}
+.notice.success{border-color:#d8c27e;background:#fff9e4;color:#604c17}
+.sidebar{border-right-color:#4b2d1b;background:#392113}
+.sidebar .brand{color:#fff5dd}
+.sidebar .brand-mark{color:#392113}
+.side-label{color:#d0b691}
+.nav-item{color:#e4d2b9}
+.nav-item:hover{background:#52331e;color:#fff8e6}
+.nav-item.active{background:#f5c928;color:#392113}
+.sidebar-bottom{border-top-color:#68482f}
+.avatar{background:#f5c928;color:#392113}
+.user-ident strong{color:#fff5dd}
+.user-ident span{color:#d0bca2}
+.logout{color:#e4d2b9}
+.logout:hover{background:#52331e;color:#fff8e6}
+.main-content{background:#fff9e9}
+.topbar{border-bottom-color:#eadfca;background:#fffdf7;color:#766657}
+.top-user{color:#59432c}
+.top-user .status-dot{background:#ce9700;box-shadow:0 0 0 3px #e8b80030}
+.secure-label{border-color:#ead9a5;background:#fff9e6;color:#70521b}
+.panel{border-color:#eadfca;background:#fffefa;box-shadow:0 2px 8px #57351608}
+.panel-icon{background:#fff2bd;color:#78500b}
+.panel-heading h2,.connect-copy h2{color:#392113}
+.panel-heading p,.connect-copy p{color:#78675b}
+.form-actions{border-top-color:#efe4d0}
+.google-badge{border-color:#e7ddca;background:#fffefa}
+.content-footer{color:#82715e}
+button:focus-visible,a:focus-visible{outline-color:#9b5b20}
+
+@media(max-width:700px){.sidebar{border-top-color:#67452a;background:#392113}.nav-item{color:#e4d2b9}.nav-item.active{background:#f5c928;color:#392113}.auth-aside::before{top:2%;right:-72px;width:170px;height:90px;border-width:7px}}
