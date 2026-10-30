@@ -1,25 +1,25 @@
 ---
-description: Security review of the current changes (diff). Maps entry points, dispatches an independent reviewer on a different model family, triages with a false-positive filter, and logs findings to .security/findings.json.
+description: Revisión read-only staged, unstaged y nuevos archivos pertinentes con otra familia; persiste evidencia sin ejecutar builds/scanners.
 subagent: false
 ---
 
-Security review of my current uncommitted changes. Follow the `security-review` skill.
+Foco opcional (datos, no shell): $ARGUMENTS
 
-!`git status -sb && echo "---DIFF---" && git diff && echo "---STAGED---" && git diff --cached`
-
-Steps:
-
-1. **Map entry points** in the diff above: every controller, `@RequestParam`/`@PathVariable`/
-   `@RequestBody`/`@ModelAttribute`, and any JPA query, JWT handler, view, or config touched.
-2. **Dispatch the `reviewer` subagent** (a different model family than whoever wrote this code)
-   with a fresh context. Give it ONLY the changed files and entry points — not my reasoning.
-   Ask it to apply the false-positive filter and report in severity order with `file:line`.
-3. **Triage its output** using the four-question rubric. Drop false positives. Keep only
-   `Confirmed` ≥0.8 in the actionable list.
-4. **Report** in `security-review` skill format: P0→P3, each with location, input→sink path,
-   impact, fix, confidence, and which agent found/validated it.
-5. **Log** every actionable finding into `.security/findings.json` (create the file if needed)
-   with a new `SEC-0xx` id, severity, confidence, `found_by`, `validated_by`, and `status: open`.
-
-If the diff is empty, say so and ask whether to review the staged changes or a specific commit
-range. Do NOT implement fixes until I choose an option at the end.
+Leer AGENTS y security-review. Este comando no tiene shell blocks ni ejecuta scanners/builds.
+1. Orquestador inventaría staged + unstaged + untracked textuales pertinentes, no sólo git diff;
+   leer nuevos archivos completos. Excluir binarios/secretos y registrar exclusiones. No
+   interpolar argumentos de usuario en shell; usar herramientas dedicadas y paths verificados.
+   Si no hay cambios en ninguno, informar vacío y ofrecer rango/archivo, sin inventar revisión.
+2. Mapear entradas Java/React/config/deploy, políticas y límites. Dar diff completo/nuevos
+   archivos y entradas al reviewer fresh context de familia distinta al autor, sin razonamiento.
+   Leer código circundante/central enforcement; no inferir IDOR por anotación ausente ni SQLi
+   por Sort.by. Incluir OAuth/cookie JWT/CSRF/account linking/proxy Template Method.
+3. Revisor devuelve resultados, nunca escribe. Hallazgos nuevos requieren validación independiente
+   finder ≠ juez de otra familia: exploiter con sólo file:line+entrada, no análisis del finder;
+   si reviewer y juez configurado son ambos Google, pedir alternativa de tercera familia antes.
+4. Orquestador registra candidatos/veredictos en `.security/findings.json`, dedup causa raíz,
+   evidencia y límites. Confirmed ≥0.8 accionables; Needs review separado pero hipótesis grave
+   bloquea, no se descarta por confianza. Rejected con causa, no borrar historial.
+5. Google 429/no disponible: un reintento máximo, luego BLOCKED independent review; alternativa
+   sólo con permiso y familia distinta. Reportar modelos reales/cobertura/tests no ejecutados
+   en handoff. Ningún hallazgo ≠ prueba de seguridad total. No fixes ni commit automáticos.

@@ -1,151 +1,55 @@
-# Authentication, session & authorization (Spring Security)
+# Identity, session and authorization
 
-The single largest source of points in a student ABM competition is **broken access control**
-(IDOR + missing `@PreAuthorize` + mass assignment). This reference makes those findings
-systematic — both to avoid them (defense) and to spot them (offense).
+Before implementation: who calls (verified identity), which object/action/tenant, what policy
+allows this caller? Classify data and document roles. Authenticated alone is not private-object
+authorization. Public/shared catalogues may allow all roles **by policy**; do not infer IDOR
+from `findById` or absent `@PreAuthorize` alone. Inspect filters, proxies, scoped repository
+queries and service guards. Object ID is not owner ID; UUID is not authorization.
 
----
+## Route and service decisions
 
-## The authorization model you must be able to state
+Explicit matchers/method auth, documented public exceptions, terminal denyAll for undeclared
+routes. Enable method security if used. Service loads object and enforces owner/tenant/role or
+explicit shared policy **before return/write/hook**, including relation IDs and list/export
+queries. DTO request excludes owner/role/active; response excludes credentials. Adopt consistent
+403 vs 404 policy to avoid sensitive existence leaks. Admin bypass only if business policy allows.
 
-Before writing (or reviewing) any protected handler, answer:
+Method annotations work via Spring proxies, not every call: self-invocation bypasses advice,
+final CGLIB methods cannot be advised. Do not trust a final Template Method annotation as the
+guard; explicit policy in algorithm plus programmatic tx or proxied non-final facade. Test
+denied callers cannot cause hooks/save and that every exposed service entry enforces policy.
 
-1. **Who** is calling? (anonymous / authenticated user / role X)
-2. **What object** is being touched, identified how? (path `id`, query param, JWT claim)
-3. **May this caller touch THIS object?** (ownership / role / tenant)
+## OAuth/OIDC and JWT
 
-A route being `authenticated()` answers only question 1. **IDOR is a failure of question 3** —
-the user is logged in, so `authenticated()` passes, but they reach someone else's object.
+Read `react-oauth-deploy.md`. OAuth delegation ≠ OIDC identity ≠ JWT token format. Bind identity
+by validated issuer+subject, not unverified email; account linking needs reauthentication and
+consent, no profile-driven admin role. Code flow correlation state/nonce, PKCE as supported and
+configured; redirect allowlist. Provider tokens backend only in BFF design.
+Validate JWT signature, allowed algorithm, issuer, audience and required exp/time policy;
+never use ID token to authenticate our API. Resource Server default is header Bearer, not cookie.
 
----
+## Sessions, cookies and CSRF
 
-## Spring Security setup checklist
+Rotate session ID on login/privilege change, expire/invalidate server-side on logout. If REST
+JWT hybrid chosen, login session is transient, API JWT chain cannot fall back to OAuth session.
+Cookies HttpOnly/Secure/appropriate SameSite; XSS can still act as user even with HttpOnly.
+Cookie JWT **also** needs CSRF for unsafe requests, including logout/refresh, despite stateless.
+Only truly header-only credentials with no ambient fallback may justify disabling API CSRF.
+SPA token materialization/BREACH handler and CSRF renewal after auth need version-specific tests.
+JWT logout must define revocation or residual short-token lifetime; clearing cookie alone
+does not invalidate a copied token. Refresh rotation/reuse detection if refresh needed.
+No tokens in localStorage/redirect URL/logs, no secrets in React bundle.
 
-| Check | ❌ Vulnerable | ✅ Secure |
-|-------|--------------|-----------|
-| Default route policy | `anyRequest().permitAll()` | `anyRequest().authenticated()` (deny by default) |
-| Method security | not enabled | `@EnableMethodSecurity` on a `@Configuration` |
-| Role checks | only in UI, or nowhere | `@PreAuthorize("hasRole('ADMIN')")` on admin handlers |
-| Ownership | controller trusts `id` | service layer compares object owner to caller |
-| Passwords | `{noop}` or raw | `PasswordEncoderFactories.createDelegatingPasswordEncoder()` (bcrypt) |
-| Session | fixed/predictable, not invalidated | regenerate on login, invalidate on logout, `HttpOnly`+`Secure` cookies |
-| CSRF | `.csrf().disable()` globally | keep CSRF for cookie auth; disable only for token APIs |
-| CORS | `allowedOriginPatterns("*")` + `allowCredentials(true)` | pin to your front-end origin |
-| Error responses | stack traces returned | generic message + log server-side |
+## Passwords (if local login required)
 
----
+Use maintained PasswordEncoder (bcrypt/Argon2 configured per version), rate limits, common
+password checks and suitable length policy. Never plaintext/{noop}/MD5/SHA-1 or default
+admin account. OIDC does not require inventing local password auth if rubric does not ask it.
 
-## Enable method security (do this once)
+## Evidence
 
-```java
-@Configuration
-@EnableMethodSecurity
-public class SecurityConfig { ... }
-```
-
-Then annotate handlers. Method security is enforced in the **service layer**, so it can't be
-bypassed by calling the service directly from another controller or a scheduled job.
-
----
-
-## IDOR: the three shapes you must recognize
-
-### A) Read IDOR — `GET /api/facturas/{id}`
-```java
-return repo.findById(id).orElseThrow();     // ❌ no ownership check
-```
-
-### B) Write IDOR — `PUT /api/facturas/{id}` or `POST` with an `id` in the body
-```java
-repo.save(facturaFromRequestBody);          // ❌ the body picks the target row
-```
-An attacker edits another user's record by changing the `id`. Always re-resolve the target
-server-side from the path id (or from the JWT), **never** from a client-supplied field.
-
-### C) Enumerated / predictable IDs
-Sequential `Long` ids are trivially enumerable. That's not a bug by itself, but combined with a
-missing ownership check it's full data exposure. (UUIDs reduce enumeration, but are NOT a
-substitute for an ownership check — they just raise the bar.)
-
-### The fix pattern (service layer, not controller)
-
-```java
-@Transactional(readOnly = true)
-public Factura obtener(Long id) {
-    Long current = auth.getUserId();                       // caller identity from SecurityContext
-    Factura f = repo.findById(id)
-        .orElseThrow(() -> new NotFoundException("factura"));
-    if (!f.getClienteId().equals(current) && !auth.hasRole("ADMIN")) {
-        throw new AccessDeniedException("no autorizado"); // or 404 to hide existence
-    }
-    return f;
-}
-```
-
-Decide your policy for "exists but not yours": **404** hides existence (safer), **403** is
-explicit. Be consistent. 404 is the safer default when objects are sensitive.
-
----
-
-## Mass assignment via role/owner on create & register
-
-A registration or create endpoint that binds to the `@Entity` accepts extra fields. Force the
-role/owner/active fields server-side:
-
-```java
-public Usuario registrar(UsuarioCrearDto dto) {
-    Usuario u = new Usuario();
-    u.setNombre(dto.nombre());
-    u.setEmail(dto.email());
-    u.setPassword(encoder.encode(dto.password()));
-    u.setRol(Rol.USER);          // ← server-chosen, never from the DTO
-    u.setActivo(true);           // ← server-chosen
-    return repo.save(u);
-}
-```
-
-The DTO must simply not have a `rol` field. If a field shouldn't be client-settable, it must
-not exist on the DTO.
-
----
-
-## Session & token handling
-
-- **New session/token on login and on privilege change.** Fixation: don't reuse the pre-login session id.
-- **Invalidate on logout**, and invalidate server-side (remove the session / blacklist the token), not just clear the cookie client-side.
-- Cookies: `HttpOnly` (no JS access → no theft via XSS), `Secure` (HTTPS only), `SameSite=Lax|Strict`.
-- **JWT:** see `spring-boot.md` §5. Pin the algorithm, check `exp`/`iss`/`aud`, secret from env.
-- Never store the password or token in logs or in `localStorage` if a cookie is viable
-  (`localStorage` is readable by any XSS on the page).
-
----
-
-## Password storage
-
-```java
-@Bean
-public PasswordEncoder encoder() {
-    return PasswordEncoderFactories.createDelegatingPasswordEncoder(); // bcrypt by default
-}
-```
-
-Never `{noop}`, never MD5/SHA-1, never a hardcoded password ("admin/admin" default accounts are
-an ASVS L1 fail). Block the top common passwords and enforce a minimum length (8+, prefer 12+).
-
----
-
-## How to audit auth quickly (defense checklist / offense checklist)
-
-Grep these and confirm each:
-
-```
-rg -n "permitAll|anonymous\(\)|csrf\(\)\.disable|allowedOrigin" 
-rg -n "@PreAuthorize|@Secured|@RolesAllowed"
-rg -n "@PathVariable.*Long id|@RequestParam.*id|@PathVariable.*UUID" 
-rg -n "@ModelAttribute|@RequestBody.*Entity"    # entity binding = mass-assignment smell
-rg -n "findById\(|getReferenceById\("           # each needs an ownership check downstream
-```
-
-For every handler that takes an `id` and calls `findById`, there must be an ownership/role
-check on the returned object. No check → IDOR. That is the finding you are hunting for and
-the bug you are defending against.
+Tests must exercise actual chain and service: anonymous, owner, foreign owner, admin,
+shared-policy access, tenant mismatch, related IDs, list filtering, write denial, missing/invalid
+JWT and CSRF, OAuth state/nonce/account binding, logout and residual session rejection.
+Central enforcement counts; annotation absence is a lead, not proof. Severity follows real
+impact/reachability, not a scoring shortcut.

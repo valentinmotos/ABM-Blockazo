@@ -1,94 +1,43 @@
-# Writeup Template
+# Writeup template (private, evidence-based)
 
-One writeup per confirmed finding. The format a judge can **reproduce without asking you a
-single question**. Keep the language factual and calm — no drama, no "hackerman" framing. You
-are a professional security analyst reporting a defect.
-
----
-
-## Structure
+One report per root cause, with affected routes listed. No scoring inflation. Fill actual
+facts, use unknown/not run when necessary. Store OUR `.security/audits/<target-id>/report.md`.
 
 ```markdown
-# <Título corto, descriptivo> — <ID>
+# <ID> — <title>
 
-| Campo | Valor |
-|-------|-------|
-| **Severidad** | P0 Crítico / P1 Alto / P2 Medio / P3 Bajo |
-| **Confianza** | Confirmed (0.9) / Likely / Needs review |
-| **CWE** | CWE-639 (IDOR) |
-| **OWASP** | A01:2021 — Broken Access Control |
-| **Componente** | `FacturaController.ver()` |
-| **Ubicación** | `src/main/java/.../FacturaController.java:24` |
-| **Encontrado por** | hunter-authz · validado por exploiter (google/gemini-4-argon) |
-| **Fecha** | 2026-10-28 |
+- Target: canonical clone identity, source SHA/ref, date, authorized read scope
+- Severity: P0/P1/P2/P3 + impact/prerequisites rationale (not pattern-based)
+- Verdict: Confirmed / Needs review / Rejected; confidence 0–1
+- Lifecycle: open / fixed / verified / rejected (rival audit does not remediate)
+- Location/entry: exact file:line, method/path, caller capability
+- Found by / independently validated by: actual role, model ID and different families
+- CWE/OWASP: only mappings supported by chosen verified edition, otherwise omit
 
-## Descripción
-Qué hace mal el código y por qué es un problema, en 2–3 frases.
+## Policy and description
+Expected owner/role/tenant/public policy, observed control and mismatch.
 
-## Superficie / Endpoint
-La ruta, método y parámetros exactos afectados:
-`GET /api/facturas/{id}` · autenticado (JWT) · sin autorización por objeto.
+## Source → sink / exposure
+Every hop and existing guard; for secret leak, actual use + who can read it, never value.
+All affected routes sharing this root cause, not duplicate findings for each route.
 
-## Cadena de explotación (input → sink)
-```
-GET /api/facturas/{id}
-  → FacturaController.ver(id)              [src/.../FacturaController.java:24]
-  → facturaRepo.findById(id)               [sin check de ownership]
-  → devuelve Factura de cualquier cliente
-```
+## Evidence
+Static derivation vs observed execution explicitly separated, redacted/minimal excerpts.
+Unknown prerequisites and coverage limits. No sensitive code sent to cloud without permission.
 
-## Pasos para reproducir (PoC)
-1. Autenticarse como usuario A (no-admin).
-2. `GET /api/facturas/1` → devuelve la factura de A.
-3. `GET /api/facturas/2` → **devuelve la factura de otro cliente** (debería ser 403/404).
+## Inert reproduction specification
+OUR .security/audits/<target-id>/poc/<id>.http, synthetic fixture preconditions, isolated base
+placeholder and expected denial/allow. No claims it was run unless authorized and observed.
+Write issues use test assertions, not rival mutations. No leaked credential use/exfil/destruction.
 
-PoC archivo: `.security/poc/SEC-001.http`
+## Impact and recommendation
+Trust boundary crossed, realistic blast radius and concrete service/filter/validation fix.
 
-```http
-POST /api/login
-Content-Type: application/json
-{"email":"a@a.com","password":"<password>"}
-
-GET /api/facturas/2
-Authorization: Bearer <token_de_A>
+## Regression / limits
+Proposed test path and assertions; actual command/ref/exit/output only if run. No runner =
+not executed. Fixed != verified without observed fail-before/pass-after. Areas not checked.
 ```
 
-## Evidencia
-La salida observada (truncada), con la parte que prueba el acceso no autorizado.
-Redacta datos personales reales; basta con mostrar que el objeto pertenece a otro usuario.
-
-## Impacto
-Quién puede explotarlo, qué obtiene, qué límite de confianza cruza. Cuantifica si puedes
-("enumerando ids 1..N se descargan todas las facturas de todos los clientes").
-
-## Recomendación (fix)
-El cambio concreto, con código cuando no sea obvio:
-```java
-// en FacturaService — ownership check antes de devolver
-if (!f.getClienteId().equals(auth.getUserId()) && !auth.hasRole("ADMIN")) {
-    throw new AccessDeniedException("no autorizado");
-}
-```
-Enlace a la regla: `secure-coding/reference/auth-authz.md` §IDOR.
-
-## Regresión
-Test que falla con el bug y pasa con el fix:
-`src/test/java/.../FacturaIdorTest.java`
-```
-
----
-
-## Style rules
-
-- **Severity by exploitability, not by pattern.** A `permitAll()` on a login page is not a
-  finding; on a data endpoint it is P0.
-- **One finding per writeup.** Don't merge "IDOR everywhere" into one — each missing check is
-  its own writeup with its own `file:line`. It reads as more thorough and scores better.
-- **State what you did NOT check.** A one-line coverage note ("no revisé la config de nginx ni
-  los tests") is honest and raises the credibility of everything else.
-- **Never overclaim.** If you couldn't prove reachability, mark it `Needs review`, not `High`.
-  One overstated finding makes a judge discount all the real ones.
-- **Redact secrets.** If you found a committed `jwt.secret`, show the file:line and say "a
-  signing key is committed" — don't paste the actual key into the writeup body.
-- **Be reproducible, not clever.** The judge must be able to paste your PoC and get the same
-  result on their machine.
+Confirmed ≥0.8 actionable, Needs review retained separately, potentially grave uncertainty
+escalated rather than dropped. Configuration alone not proof of public exposure. Independent
+review unavailable means BLOCKED, not pass. Private responsible disclosure to organizer.

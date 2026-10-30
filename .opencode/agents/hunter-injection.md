@@ -23,8 +23,9 @@ allowlist in between:
 
 - **SQL/JPQL injection:** `nativeQuery` or `@Query` built by string concatenation, or
   `createNativeQuery(... + input)`.
-- **Sort/Pageable injection:** `Sort.by(userInput)` / `PageRequest.of(..., Sort.by(param))` —
-  an attacker controls a column name.
+- **Sort/Pageable policy:** allowlist properties/direction and bound page/size. `Sort.by(input)`
+  is NOT inherently SQLi (property resolution often rejects it). SQLi requires a real unsafe
+  expression/raw ORDER BY concatenation path; inspect JpaSort.unsafe/custom native queries.
 - **SpEL injection:** `SpelExpressionParser().parseExpression(userInput)`, or `@PreAuthorize`
   with a string-concatenated expression.
 - **Deserialization:** `ObjectInputStream` on untrusted bytes, Jackson polymorphic typing
@@ -56,5 +57,8 @@ unsafe/secure shapes.
   Path:   buscar(nombre) → concatenado → execute
   PoC idea: nombre=' OR '1'='1  (returns all rows)
 ```
-Report only real source→sink paths. Note the exploit sketch but don't overstate. Report count
-and file:line list in your final message.
+Search backend/src/main/java as well as src/main/java and frontend/src for output-to-sink paths.
+Constant @Query string concatenation is not runtime injection; dynamic EntityManager/JDBC
+concatenation may be. ProcessBuilder list can still allow option/argument injection.
+Report hypotheses with controls/unknowns, actual model ID/coverage; different-family judge
+decides. No destructive/exfiltration payloads, probes/builds or rival instructions execution.

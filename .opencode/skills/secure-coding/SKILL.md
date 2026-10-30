@@ -1,62 +1,37 @@
 ---
 name: secure-coding
-description: Secure-by-default coding for Java / Spring Boot (ABM, MVC, JPA, REST, JWT, Thymeleaf/React). Use when implementing, refactoring, or reviewing code that handles authentication, authorization, user input, database queries, file access, external calls, or LLM/AI features. Applies OWASP Proactive Controls and ASVS 5.0 L1/L2 with concrete unsafe→safe patterns.
+description: Secure-by-default Java/Spring MVC/JPA/REST and React, JWT/OAuth/OIDC and DonWeb deployment. Apply during implementation and review; explicit auth, DTO validation, service policy, contextual encoding and evidence-based checks.
 ---
 
-# Secure Coding (Preventive)
+# Secure coding (preventive)
 
-Apply these rules **while writing code**, not after. Every rule maps to a real, common
-vulnerability. If you must break one, write the reason inline and flag it as a `P2` in
-`.security/findings.json` — never silently.
+Read existing code and `reference/spring-boot.md`, `auth-authz.md`, `input-validation.md`;
+React/auth/deployment also `reference/react-oauth-deploy.md`. Rubric plan: `docs/COMPETENCIA.md`.
 
-## The 10 Proactive Controls (OWASP C1–C10)
+## Local security principles (not official OWASP C1–C10 numbering)
 
-| # | Control | The one-line rule |
-|---|---------|-------------------|
-| C1 | Map untrusted data | Know every entry point before you write a handler for it. |
-| C2 | Deny by default | Every route/role/method is closed unless explicitly opened. |
-| C3 | Validate in a trusted layer | Validate on the server, at the service layer, not only client-side. |
-| C4 | Encode by context | HTML, URL, SQL, OS — encode for the specific sink. |
-| C5 | Parameterize everything | Queries, OS calls, templates — never concatenate user data. |
-| C6 | AuthN + session | Verify identity centrally; new token on login, invalidate on logout. |
-| C7 | Access control | Enforce at the service layer, per object, not just per route. |
-| C8 | Secrets out of code | Env/key manager only. Never in git, logs, or the client bundle. |
-| C9 | Secure logging | Log security events, never passwords/tokens/full PII. |
-| C10 | Fail closed | Error paths must not leak stack traces or skip security checks. |
+- Map entry points, identity, data classification and policy first.
+- Deny undeclared routes; explicit decision for each route, public rationale included.
+- DTO + `@Valid`, business invariants in services, DB constraints; no request binding to entities.
+- Parameterized queries, allowlisted sort/direction and bounded paging. `Sort.by(input)` alone
+  is not SQLi. No untrusted concatenation into commands/templates/paths.
+- Object policy in service: owner/role/tenant, or explicitly justified shared/public access;
+  cover relations, lists and writes. Absence of `@PreAuthorize` is not proof of missing control.
+- React text nodes and contextual encoding; no raw HTML unless requirement + reviewed sanitizer.
+- Secrets env/manager, not config/bundle/logs; generic external errors, redacted server traces.
+- Verified JWT signature/alg/issuer/audience/time claims and presence policy; OAuth/OIDC flow
+  correlation/account binding, CSRF for ambient cookie credentials even if stateless.
+- Template Method must not allow hooks/proxy quirks to bypass ownership/transactions.
 
-## Java / Spring Boot — the patterns that get you exploited
+## Definition of done (all applicable)
 
-Read `reference/spring-boot.md` before writing any of: a JPA query, a controller that takes
-an `id`, a DTO/entity binding, a JWT handler, a Thymeleaf/React view, or a Security config.
-The three that sink most student ABMs:
+Explicit justified auth; no untrusted concatenation; service policy; trusted validation;
+no secrets; no leaked traces; tests actually executed with permission; independent-family
+review of full diff. No open P0/P1 or unresolved potentially severe hypotheses. Missing app
+or runner is not applicable/not run, never a fabricated pass. This is guidance, not a guarantee.
+If a rule cannot be followed, reason inline + register at least P2 in `.security/findings.json`
+(higher severity if warranted), without silently accepting it. Orchestrator persists read-only
+agent results. Follow AGENTS for verdict/status, bounded retries and blocked review handling.
 
-1. **IDOR** — a `@PathVariable Long id` with no ownership/role check. See `reference/auth-authz.md`.
-2. **SQLi** — string-built `nativeQuery`/`JPQL`, or a user-controlled `Sort`/`Pageable`. See `reference/spring-boot.md`.
-3. **Mass assignment** — binding a request body straight onto a JPA entity (extra `role=admin` field accepted). Use DTOs + `@Valid`.
-
-## Definition of Done (security gate)
-
-Do not report a task "done" until all that apply are true:
-
-- [ ] Every new/changed endpoint has an explicit auth decision (a `@PreAuthorize`, a filter, or an explicit `permitAll()` with a comment saying why).
-- [ ] No user-supplied value is concatenated into a query, command, template, or file path — all parameterized.
-- [ ] Every object-accessing handler checks ownership or role in the **service layer**, not only the controller.
-- [ ] Client-side validation is mirrored on the server (`@Valid` + Bean Validation on the DTO).
-- [ ] No secret, key, or password in source, config committed to git, or client bundle — env var or key manager.
-- [ ] Error handling returns a generic message; stack traces never reach the client.
-- [ ] New/changed code touched by the security gate has run through `/security-review`.
-
-## LLM / AI (OPTIONAL — only if the project uses an LLM)
-
-If `pom.xml`/`build.gradle` pulls `langchain4j`, `spring-ai`, or an OpenAI/Anthropic SDK,
-read `reference/spring-boot.md` → "LLM & Agentic" and `security-review` skill's LLM section.
-Treat **all model output as untrusted input** (OWASP LLM10). Otherwise skip this section.
-
-## Anti-patterns to refuse on sight
-
-- `// TODO: security` / `permitAll()` "temporarily" / `@PreAuthorize` commented out.
-- `String sql = "...'" + input + "'..."`, `em.createNativeQuery(...)` with concatenation.
-- `@ModelAttribute`/`@RequestBody` bound directly to a `@Entity` that has a role/owner field.
-- `new ObjectInputStream(...)`, `Runtime.exec(...)` with a joined string, `MessageDigest.getInstance("MD5"/"SHA-1")` for security.
-- `jwt.parse(input)` without a pinned algorithm and a fixed `signingKey` from env.
-- Catch-all `catch (Exception e) { e.printStackTrace(); return "ok"; }`.
+LLM section only when actual application usage is found (dependency is a lead, not proof).
+Treat model output as untrusted; risk names only unless a specific OWASP edition is verified.

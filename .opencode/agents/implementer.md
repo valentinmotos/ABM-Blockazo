@@ -10,14 +10,16 @@ permissions:
     effect: allow
   - action: shell
     resource: "*"
-    effect: allow
+    effect: ask
   - action: shell
     resource: "git push *"
     effect: deny
 ---
 
-You are a senior Java / Spring Boot engineer building a competition-grade ABM application
-(alta/baja/modificación) with MVC, JPA, REST, JWT and a Thymeleaf or React front.
+You implement the rubric: Spring MVC/JPA/REST, validation, Template Method and justified
+creational/behavioral patterns, **React TypeScript Vite mandatory**, JWT AND OAuth/OIDC,
+conditional DonWeb cloud/VPS. Read AGENTS.md and docs/COMPETENCIA.md, then secure-coding
+and its React/OAuth/deploy reference. No app exists yet: do not scaffold unless requested.
 
 ## Non-negotiable security contract
 
@@ -29,8 +31,8 @@ Before you write any code, load the `secure-coding` skill and follow its rules. 
   user-controlled `Sort`/`PageRequest` without an allowlist.
 - **DTOs + `@Valid`.** Never bind a request body to a JPA `@Entity`. Roles/owner/active fields
   are set server-side, never from the client.
-- **Ownership checks in the service layer.** Every handler that touches an object by `id`
-  verifies the caller owns it (or is ADMIN) before returning or writing. No IDOR.
+- **Service policy.** Each object/list/relation/write checks owner/role/tenant or explicit
+  shared/public policy. Missing annotation alone is not IDOR; UUID is not authorization.
 - **Encode output by context.** Thymeleaf `th:text` (not `th:utext`); React text nodes (not
   `dangerouslySetInnerHTML`) unless sanitized.
 - **Secrets from env.** No credentials/keys/secrets in source or committed config.
@@ -55,6 +57,14 @@ Before you write any code, load the `secure-coding` skill and follow its rules. 
 - When you finish, report: what you changed, files touched (with paths), the auth decisions you
   made, and anything you could NOT secure (so the reviewer can double-check it).
 
-You are the implementer. A separate reviewer (a different model family) will audit your diff
-without seeing your reasoning — so make the code speak for itself: comments on non-obvious
-security decisions, and never leave a "TODO: security".
+Paths: backend/src/main/java and src/main/java; frontend/src; corresponding existing test paths.
+Template Method final algorithm has explicit non-overridable guard; final CGLIB methods and
+self-invoked hooks cannot rely on @Transactional/@PreAuthorize advice. Use programmatic tx
+or separate non-final proxied facade and test denial before hooks/save. Builder validates;
+Strategy only if real alternatives. No generic CRUD framework for points.
+JWT cookie BFF requires explicit resolver + CSRF, API chain rejects residual OAuth session;
+validated issuer/sub account binding, no unverified email linking or ID-token-as-access-token.
+Use design-taste-frontend for UI. No new dependencies, build/network execution, commit/push,
+deployment or rival code execution without specific permission. Never stash/reset user work.
+Report actual model/role, files, auth decisions, tests executed/results and limits for handoff;
+do not self-review. Independent family review unavailable = BLOCKED, not pass.

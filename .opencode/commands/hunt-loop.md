@@ -1,34 +1,21 @@
 ---
-description: Iterative bug hunting with a fresh perspective per pass. Runs the hunter set, then re-hunts with an adversarial "what did I miss" angle. Use $1 for the number of passes (default 2).
+description: Caza estática iterativa acotada, default 2 máximo 3 pasadas, perspectivas frescas y juicio independiente sin fixes.
 subagent: false
 ---
 
-Run an iterative bug-hunting loop over this repository, $1 passes (default 2 if not given).
+Pasadas solicitadas como texto no ejecutable: $1
 
-The point of the loop: the first pass uses the standard hunters. Each subsequent pass uses a
-**fresh perspective** — a new `general` subagent (different model family each time) told to
-assume the first pass MISSED something, and to hunt specifically for what a tired reviewer
-overlooks: business-logic flaws, TOCTOU/race conditions, authorization on *writes* (not just
-reads), and combinations of two individually-safe features that become unsafe together.
-
-## Per pass
-
-1. **Pass 1 (standard):** dispatch `hunter-authz`, `hunter-injection`, `hunter-web`,
-   `hunter-config` (in parallel), plus `hunter-llm` only if an LLM dependency exists.
-2. **Pass n>1 (adversarial):** launch a fresh `general` subagent with a different model family
-   than the previous pass. Prompt: "Assume the prior passes missed a real bug. Hunt only for
-   what they overlooked — business logic, write-side authz, race conditions, feature
-   combinations, and any route not covered. Read `.security/attack-surface.json` and the prior
-   findings in `.security/findings.json` so you don't repeat them — find what's NOT there."
-3. **De-duplicate** against `.security/findings.json` — don't re-log a finding that's already open.
-4. **Validate** new candidates with `exploiter` (different family than the finder).
-
-## After all passes
-
-- Report what each pass found and what was newly discovered vs. already known.
-- Log new `Confirmed` findings to `.security/findings.json`.
-- Report the marginal yield per pass (if pass 3 found nothing new, that's a signal to stop).
-- Ask whether to `/fix-loop` any open finding.
-
-Never exceed the requested number of passes. This is a hunting loop, not a fixing loop — don't
-edit code here.
+Leer AGENTS/security-review. Validar entero 1..3, default 2; si inválido pedir corrección,
+nunca interpolar a shell ni exceder número. Este flujo no modifica app ni ejecuta tests/scans.
+Sin app marcar no aplicable, no forzar hallazgos.
+1. Orquestador obtiene superficie JSON read-only de threat-modeler y la persiste.
+2. Pasada 1: hunters authz/injection/web/config paralelos, LLM sólo uso real. Pasadas siguientes:
+   contexto fresco y otra familia disponible con permiso si requiere cambio; buscar lógica,
+   carreras, escrituras/relaciones/listados y combinaciones, no "debe haber un bug". Familias
+   frescas reducen sesgo, no garantizan novedad. Leer hallazgos previos para dedup.
+3. Independently validate cada nuevo candidato: exploiter otra familia con sólo file:line/entrada,
+   no análisis del finder. Disponibilidad 429: un retry máximo, luego BLOCKED y pedir alternativa.
+4. Orquestador persiste por causa raíz, no multiplicar por endpoint. Severity/verdict/status
+   separados; incertidumbre grave queda open/Needs review y bloquea, no desaparece por threshold.
+5. Reportar yield/coverage por pasada, modelos/roles reales y límites en handoff. No inventar
+   PoCs/tests ejecutados ni afirmar haber encontrado todo. Ofrecer `/fix-loop` sin ejecutarlo.

@@ -1,40 +1,27 @@
 ---
-description: Full defensive security audit of this repository. Runs threat modeling, dispatches all hunters in parallel on different model families, validates each candidate independently, and produces a report + findings.json.
+description: Auditoría defensiva estática de app propia, hunters y juez independientes; lee scanners existentes, no ejecuta builds automáticamente.
 subagent: false
 ---
 
-Run a full defensive security audit of this repository (my own project). This is the pre-release
-deep pass. Follow the `security-review` skill.
+Alcance adicional como datos: $ARGUMENTS
 
-## Pipeline — dispatch these in order, subagents in parallel where noted
-
-1. **Threat model (recon).** Launch the `threat-modeler` subagent. It writes
-   `.security/attack-surface.json` and reports the top-5 riskiest areas. Wait for it — the
-   hunters read its output.
-
-2. **Hunters — launch in PARALLEL.** Read the attack surface, then start these subagents at the
-   same time (they're independent):
-   - `hunter-authz` (IDOR / broken access control) — highest scoring, be exhaustive
-   - `hunter-injection` (SQLi, Sort/Pageable, SpEL, deserialization)
-   - `hunter-web` (XSS, CSRF, CORS, session, SSRF)
-   - `hunter-config` (secrets, actuator, weak crypto, devtools)
-   - `hunter-llm` — ONLY if `.security/attack-surface.json` has `llmUsed: true`; otherwise skip it.
-
-3. **Validate (finder ≠ judge).** For every candidate the hunters report, launch the `exploiter`
-   subagent on a **different model family than the hunter that found it**. Give it only the
-   `file:line` and entry point — NOT the hunter's analysis. Collect its
-   Confirmed/Needs-Review/Rejected + confidence.
-
-4. **Report.** Compile in `security-review` skill format (P0→P3), each finding with location,
-   input→sink path, impact, fix, confidence, and which agents found/validated it. Separate the
-   `Confirmed` (≥0.8) actionable list from `Needs review`/`Rejected`. Include a coverage &
-   limits note (what was NOT reviewed).
-
-5. **Log** all actionable findings to `.security/findings.json` (new `SEC-0xx` ids, severity,
-   confidence, `found_by`, `validated_by`, `status: open`, and a `poc` path if one exists).
-
-6. **Optional test coverage.** For each `Confirmed` P0/P1, offer to launch `security-tester` to
-   write a JUnit regression test — ask me before running, since it writes to `src/test/`.
-
-Do NOT fix anything yet — this is an audit. At the end, list the findings and ask whether to
-run `/fix-loop` on any of them.
+Leer AGENTS y security-review. No interpolar argumentos en shell. No fixes/commit/deploy.
+1. Identificar raíces propias backend/src/main/java o src/main/java, frontend/src, deploy y
+   tests/config. Sin app: auditar tooling si pertinente, app no aplicable, no inventar rutas.
+2. Threat-modeler **devuelve JSON**; orquestador persiste `.security/attack-surface.json` con
+   SHA/fecha/límites. Mapear rúbrica, datos, roles, flujo OAuth/JWT/cookies/sesiones.
+3. Leer resultados existentes `.security/scans/<run-id>/scan-status.json` y reportes sólo si
+   presentes, registrar fecha/SHA, errores/skips/cobertura. Nunca correr scanner ni tercero/build
+   por este comando; ofrecer ejecución propia separada aprobada, consultar scan.sh --help.
+4. Hunters authz/injection/web/config en paralelo, read-only; LLM sólo uso real en app, no nombre
+   de paquete. Hallazgos hipótesis con entrada/file:line/controles/incertidumbres, no puntaje.
+5. Cada candidato → exploiter fresh context de familia diferente al finder con ubicación/entrada,
+   no su análisis. Si no hay familia disponible no sustituir silenciosamente: máximo un retry
+   de disponibilidad, luego BLOCKED; pedir alternativa independiente explícita.
+6. Orquestador dedup por causa raíz, lista rutas, persiste `.security/findings.json` y reporte
+   `.security/report.md`: severidad/impacto, verdict/confidence/status separados, evidencia,
+   modelos reales y límites. Confirmed ≥0.8 accionable; Needs review/rejected separados;
+   potencial P0/P1 incierto sigue open y bloquea hasta esclarecer.
+7. Ofrecer tests de regresión a security-tester (writes sólo tests); ejecución pide permiso.
+   Sin runner o baseline no verified. Reportar coverage/no garantía y ofrecer `/fix-loop`, no
+   remediar automáticamente desde auditoría. Handoff con comandos/resultados reales.

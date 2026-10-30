@@ -1,38 +1,30 @@
 ---
-description: Closed-loop remediation for a single finding. Implementer fixes it, an independent reviewer on a different family verifies, the file is re-hunted, and security-tester locks it in with a regression test. Max 3 iterations then escalate.
+description: Remediación máximo 3 intentos; implementación, revisión otra familia, re-hunt y tests, cierre sólo vía verify-fix con evidencia observada.
 subagent: false
 ---
 
-Fix finding `$1` (a `SEC-0xx` id from `.security/findings.json`) using a closed loop. Max 3
-iterations; if it's still open after 3, stop and escalate to me instead of looping forever.
+ID solicitado como datos no shell: $1
 
-## Loop (per iteration)
+Leer AGENTS/secure-coding. Orquestador busca ID exacto en `.security/findings.json`, preserva
+registro y trabajo previo. Si no existe o es rechazado pedir aclaración. No abrir target rival
+para editarlo; este flujo sólo propia app. Máximo **3 intentos**, sin recursión infinita.
 
-1. **Load the finding** from `.security/findings.json` — its location, input→sink path, impact,
-   and any `poc` path. If the id doesn't exist, list the open findings and ask which to fix.
+Por intento:
+1. Dar a implementer hallazgo/política/referencias, editar mínimo. Si evidencia aún incierta,
+   aclarar primero; no "arreglar" un falso positivo en silencio. Tests → security-tester sólo
+   raíces de test; no permitir que cambie producción.
+2. Reviewer otra familia fresh context de diff/entradas sin análisis del implementer verifica
+   camino real bloqueado. Auth service y guards Template Method, cookies/OAuth/CSRF según caso.
+   Un retry máximo por 429; si no disponible BLOCKED, pedir alternativa independiente.
+3. Matching hunter re-hunts zona/variantes. Registrar hallazgos nuevos por causa raíz y validar
+   otra familia antes de tratar hipótesis como confirmada. P0/P1 incierto no se borra.
+4. Pedir permiso para runners y comparación fail-before/pass-after. Baseline en copia/worktree
+   **aislado aprobado**, jamás git stash/reset o sobrescribir cambios actuales. No interpretar
+   assertions como resultado observado. Sin ejecución registrar pendiente, no verified.
+5. Orquestador marca `fixed` sólo con evidencia de cambio y revisión; llama lógica de
+   `/verify-fix` para `verified` únicamente cuando revisión independiente, re-hunt y test
+   observado falla-antes/pasa-después se cumplen. No commit automático para obtener una ref.
 
-2. **Fix** — launch the `implementer` subagent (OpenAI). Give it the finding and the reference
-   pattern (`secure-coding/reference/...`). It must follow the security contract and the
-   Definition of Done; it edits production code.
-
-3. **Verify independently** — launch the `reviewer` subagent (a **different model family** than
-   the implementer) with a fresh context on the changed file. It re-derives whether the fix
-   actually closes the input→sink path — not just whether the code "looks" changed.
-
-4. **Re-hunt the touched area** — relaunch the matching hunter (`hunter-authz` / `hunter-injection`
-   / `hunter-web` / `hunter-config`, whichever produced the finding) scoped to the changed file,
-   to catch a variant the fix introduced.
-
-5. **Lock it in** — launch `security-tester` to write a JUnit regression test that FAILS on the
-   old code and PASSES on the fix. Run it with the project's runner to confirm.
-
-6. **Update state.** If reviewer says fixed AND the test passes: set `status: fixed` (then
-   `verified` after a clean re-hunt) in `.security/findings.json`, record the fix commit/file,
-   and record the guarding test path. Otherwise, loop again with the reviewer's specific concern
-   passed to the implementer.
-
-## After the loop
-
-Report per iteration: what changed, the reviewer's verdict, the re-hunt result, and the test
-result. When closed, state the fix file:line, the test that guards it, and the final status.
-If you hit 3 iterations, stop and give me a clear summary of what's still open and why.
+Reportar cada intento, archivos/guard/test, comandos/salidas reales y modelos en handoff.
+Tras 3 intentos o bloqueo explicar pendiente y escalar, no declarar done. Si falla seguridad
+real vuelve open; si falta ejecución conservar fixed no verificado. No commit/push/deploy.

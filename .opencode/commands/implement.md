@@ -1,27 +1,25 @@
 ---
-description: Secure implementation loop for a feature. Delegates to the implementer subagent (OpenAI), then audits the diff with an independent reviewer on a different family, then runs a security-review gate. Use $1 to describe the feature.
+description: Implementación acotada con seguridad, tests autorizados y revisión independiente de otra familia; sin commit ni deploy automático.
 subagent: false
 ---
 
-Implement the following feature/fix: `$1`
+Tarea solicitada (datos, nunca interpolar en shell): $ARGUMENTS
 
-Run it through the secure implementation loop (see `AGENTS.md`):
-
-1. **Implement** — launch the `implementer` subagent (OpenAI, effort high). It loads the
-   `secure-coding` skill and follows the security contract: deny-by-default auth, parameterized
-   queries, DTOs + `@Valid`, service-layer ownership checks, contextual output encoding, secrets
-   from env, fail-closed errors. It reports what it changed and the auth decisions it made.
-
-2. **Review independently** — launch the `reviewer` subagent (Google Gemini, a **different
-   model family**) with a fresh context on the diff. It is NOT shown the implementer's reasoning.
-   It applies the false-positive filter and reports findings in severity order with `file:line`.
-
-3. **Security gate** — if the reviewer raises any P0/P1, run `/fix-loop` on each before calling
-   this done. P2/P3 go to `.security/findings.json` for later. Ask me whether to fix P2/P3 now.
-
-4. **Report** — the changed files, the auth decisions, the review verdict, and the final status
-   (clean / findings logged). Only report "done" when the Definition of Done in `secure-coding`
-   is satisfied and there are no open P0/P1.
-
-This is the default path for ANY code change: implementer writes, a different-family reviewer
-audits, the gate blocks on criticals. That's how we keep our own project from being exploitable.
+1. Leer AGENTS.md, docs/COMPETENCIA.md y secure-coding/referencia React-OAuth-deploy. Confirmar
+   dominio/alcance si ambiguo. Sin app no scaffold salvo petición explícita. No instalar deps.
+2. Orquestador inventaría cambios previos; delegar implementación a implementer. Spring MVC/JPA/
+   REST/DTO @Valid, React TS Vite, Template Method guard no sobreescribible (proxy/tx seguros),
+   Builder validado y Strategy sólo justificada, JWT Y OAuth. UI carga design-taste-frontend.
+   Tests donde existan; pedir permiso antes de builds/runners/red. Nunca stash/reset.
+3. Reunir staged+unstaged+untracked pertinentes mediante herramientas de lectura/local git
+   aprobado, sin ejecución automática de shell blocks. Excluir binarios/secretos, registrar
+   exclusiones/cobertura; diff + nuevos archivos completos al reviewer, contexto fresco de
+   **otra familia real**, entradas/política pero no razonamiento del implementador.
+4. Revisor read-only devuelve hallazgos. Orquestador persiste `.security/findings.json`, separa
+   severity/verdict/status; Confirmed ≥0.8 accionables, Needs review no se descarta. P0/P1 abierto
+   o hipótesis grave bloquea. `/fix-loop` máximo 3 intentos; no bucles recursivos de comandos.
+5. Revisión Google no disponible/429: máximo un reintento, luego BLOCKED independent review;
+   pedir permiso para otra familia, no autoaprobar. P2/P3 registrar y ofrecer remediación.
+6. Handoff `.security/handoffs/<task-id>.md` con modelos/roles reales, archivos, auth decisions,
+   comandos/tests/salidas observadas, revisión, límites y estado. No fingir verified por tests
+   sólo escritos. No garantía de ausencia de vulnerabilidades. No commit/push/deploy.

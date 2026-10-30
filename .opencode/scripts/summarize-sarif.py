@@ -8,6 +8,7 @@ Usage:
     .opencode/scripts/summarize-sarif.py .security/semgrep.sarif [more.sarif ...]
     .opencode/scripts/summarize-sarif.py .security/*.sarif --top 20
 """
+import argparse
 import json
 import sys
 from collections import Counter, defaultdict
@@ -23,9 +24,9 @@ def rule_index(run):
         driver = run.get("tool", {}).get("driver", {})
         for r in driver.get(section, []) or []:
             idx[r.get("id")] = r
-    # extended driver (taxonomies/toolComponent) — best effort
+    # SARIF extensions are toolComponent objects directly.
     for ext in run.get("tool", {}).get("extensions", []) or []:
-        for r in ext.get("toolComponent", {}).get("rules", []) or []:
+        for r in ext.get("rules", []) or []:
             idx.setdefault(r.get("id"), r)
     return idx
 
@@ -43,15 +44,30 @@ def rule_level(rule, result):
 
 
 def collect(path):
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
+    with open(path, "r", encoding="utf-8") as f:
         doc = json.load(f)
+    if not isinstance(doc, dict) or doc.get("version") != "2.1.0" or not isinstance(doc.get("runs"), list):
+        raise ValueError("expected SARIF 2.1.0 with runs array")
     rows = []
-    for run in doc.get("runs", []) or []:
+    for run in doc["runs"]:
+        if not isinstance(run, dict) or not isinstance(run.get("tool", {}).get("driver"), dict):
+            raise ValueError("invalid SARIF run/tool")
+        if not isinstance(run.get("results", []), list):
+            raise ValueError("invalid SARIF results")
+        for invocation in run.get("invocations", []):
+            if invocation.get("executionSuccessful") is False or any(
+                n.get("level") == "error" for n in invocation.get("toolExecutionNotifications", [])
+            ):
+                raise ValueError("SARIF reports an incomplete scanner invocation")
         rules = rule_index(run)
-        for res in run.get("results", []) or []:
+        for res in run.get("results", []):
+            if not isinstance(res, dict) or not isinstance(res.get("message"), dict):
+                raise ValueError("invalid SARIF result/message")
             rid = res.get("ruleId", "<no-rule>")
             rule = rules.get(rid)
             level = rule_level(rule, res)
+            if level not in SEV_ORDER:
+                raise ValueError("invalid SARIF severity level")
             loc = "?"
             msg = (res.get("message") or {}).get("text", "").strip().splitlines()
             msg = msg[0] if msg else ""
@@ -66,24 +82,27 @@ def collect(path):
 
 
 def main(argv):
-    files = [a for a in argv if not a.startswith("--")]
-    top = 25
-    if "--top" in argv:
-        try:
-            top = int(argv[argv.index("--top") + 1])
-        except (IndexError, ValueError):
-            pass
-    if not files:
-        print(__doc__)
-        return 1
+    def positive(value):
+        number = int(value)
+        if number <= 0:
+            raise argparse.ArgumentTypeError("must be a positive integer")
+        return number
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("files", nargs="+", help="SARIF 2.1.0 reports")
+    parser.add_argument("--top", type=positive, default=25, help="positive maximum rows/rules (default: 25)")
+    args = parser.parse_args(argv)
+    files, top = args.files, args.top
 
     all_rows = []
     per_file = {}
+    failed = False
     for f in files:
         try:
             rows = collect(f)
-        except (OSError, json.JSONDecodeError) as e:
-            print(f"! could not read {f}: {e}", file=sys.stderr)
+        except (OSError, ValueError, TypeError, AttributeError, KeyError, IndexError):
+            print(f"! unreadable, invalid, or incomplete SARIF: {f}", file=sys.stderr)
+            failed = True
             continue
         per_file[f] = rows
         all_rows.extend(rows)
@@ -91,9 +110,15 @@ def main(argv):
     print("# SARIF summary")
     print(f"Files: {len(per_file)} · Total findings: {len(all_rows)}\n")
 
+    if not per_file:
+        print("No valid reports read; coverage unknown.")
+        return 2
     if not all_rows:
-        print("No findings. (Deterministic scanners are one signal — pair with the LLM hunters.)")
-        return 0
+        if failed:
+            print("No candidates in readable reports; coverage incomplete due to report errors.")
+        else:
+            print("No findings in the supplied valid reports; this does not establish full scan coverage.")
+        return 2 if failed else 0
 
     by_sev = Counter(r["level"] for r in all_rows)
     print("## By severity")
@@ -116,7 +141,7 @@ def main(argv):
         print(f"  ... {len(rows) - top} more (use --top N)")
     print()
     print("Confirm reachability before reporting — a scanner hit is a candidate, not a verdict.")
-    return 0
+    return 2 if failed else 0
 
 
 if __name__ == "__main__":
