@@ -1,0 +1,25 @@
+spring:
+  config.import: optional:file:../.env[.properties]
+  application.name: abm-blockazo
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate.ddl-auto: validate
+  flyway.enabled: true
+app.oauth.google.enabled: ${GOOGLE_OAUTH_ENABLED:false}
+server:
+  forward-headers-strategy: framework
+  servlet:
+    session.cookie.http-only: true
+    session.cookie.secure: ${COOKIE_SECURE:true}
+    session.cookie.same-site: lax
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER}
+    audience: ${JWT_AUDIENCE}
+    secure-cookie: ${COOKIE_SECURE:true}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}

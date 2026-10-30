@@ -5,6 +5,8 @@
 # ── Java / build ──
 target/
 build/
+node_modules/
+dist/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
